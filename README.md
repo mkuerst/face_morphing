@@ -3,6 +3,6 @@
 ## Student data
 
 Name: Michael Kürsteiner  
-Legi-Nr: 16-708-414
+Legi-Nr: 16-708-414  
 Email: kumichae@student.ethz.ch
 
