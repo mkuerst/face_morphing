@@ -5,6 +5,13 @@
 #include <imgui/imgui.h>
 #include <igl/slice_into.h>
 #include <igl/slice.h>
+#include <igl/boundary_loop.h>
+#include <igl/octree.h>
+#include <igl/cotmatrix.h>
+#include <igl/repdiag.h>
+#include <igl/knn.h>
+#include <igl/cat.h>
+#include <unordered_set>
 
 using namespace std;
 using namespace Eigen;
@@ -24,6 +31,24 @@ MatrixXi Ft;
 // positions of landamrks for scan and template
 MatrixXd landmarks_pos;
 MatrixXd landmarksT_pos;
+
+// landmark indices
+VectorXi landmarks;
+VectorXi landmarksT;
+
+// intermediate constraints assembled in nra_prep()
+VectorXi inter_ind; 
+MatrixXd inter_pos;
+
+//knn
+MatrixXi KNN;
+
+// keep track of already added constraint to avoid duplicates
+// unordered set has a useful find fct
+unordered_set<int> added_constraintsT;
+unordered_set<int> added_constraints;
+
+bool prepared = false;
 
 bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers);
 
@@ -55,11 +80,11 @@ double mean_dist(MatrixXd pos, RowVector3d center) {
 void rigid_alignment(string obj_file="", string lm_file="" )
 {
     //landmarks on scanned person
-    VectorXi landmarks = get_landmarks("./data/person0__23landmarks");
+    landmarks = get_landmarks("./data/person0__23landmarks");
     igl::slice(V, landmarks, 1, landmarks_pos);
 
     //landmarks on template
-    VectorXi landmarksT = get_landmarks("./data/headtemplate_23landmarks");
+    landmarksT = get_landmarks("./data/headtemplate_23landmarks");
     igl::slice(Vt, landmarksT, 1, landmarksT_pos);
 
     // center template to origin s.t. mean of its vertices is (0,0,0)
@@ -105,6 +130,163 @@ void rigid_alignment(string obj_file="", string lm_file="" )
     // update landmark position after the scan has been rotated
     igl::slice(V, landmarks, 1, landmarks_pos);
 }
+
+
+// Copied and modified for bigger number of constraints from assignment4
+void ConvertConstraintsToMatrixForm(VectorXi indices, MatrixXd positions, Eigen::SparseMatrix<double> &C, VectorXd &d)
+{
+	// Convert the list of fixed indices and their fixed positions to a linear system
+	// Hint: The matrix C should contain only one non-zero element per row and d should contain the positions in the correct order.
+	std::vector<Eigen::Triplet<double> > tripletList;
+	C.resize(indices.rows()*3, Vt.rows()*3);
+	d.resize(3 * indices.size());
+	for (int i = 0; i < indices.size(); i++) {
+		tripletList.push_back(Eigen::Triplet<double>(i, indices(i), 1.));
+		tripletList.push_back(Eigen::Triplet<double>(indices.rows()+i, Vt.rows()+indices(i), 1.));
+    tripletList.push_back(Eigen::Triplet<double>(2 * indices.rows()+i, 2 * Vt.rows()+indices(i), 1.));
+		d(i) = positions(i, 0);
+		d(i + indices.rows()) = positions(i, 1);
+    d(i + 2 * indices.rows()) = positions(i, 2);
+	}
+	C.setFromTriplets(tripletList.begin(), tripletList.end());
+}
+
+
+void nra_prep(int k=5) {
+  
+  // store scan boundary into boundary_pos
+  VectorXi boundary_ind;
+  MatrixXd boundary_pos;
+
+  igl::boundary_loop(F, boundary_ind);
+  igl::slice(V, boundary_ind, 1, boundary_pos);
+
+  // add scan landmarks and boundary as constraints
+  for (int i=0; i<boundary_ind.rows(); i++) {
+      added_constraints.insert(boundary_ind(i));
+  }
+
+  for (int i=0; i<landmarks.rows(); i++) {
+    added_constraints.insert(landmarks(i));
+  }
+
+  // store template boundary into boundaryT_pos
+  VectorXi boundaryT_ind;
+  MatrixXd boundaryT_pos;
+
+  igl::boundary_loop(Ft, boundaryT_ind);
+  igl::slice(Vt, boundaryT_ind, 1, boundaryT_pos);
+
+
+  // add template landmarks and boundary as constraints
+  for (int i=0; i<landmarksT.rows(); i++) 
+    added_constraintsT.insert(landmarksT(i));
+
+  for (int i=0; i<boundary_ind.rows(); i++) 
+      added_constraintsT.insert(boundaryT_ind(i));
+
+
+  // add neighbors of boundary points
+  vector<vector<int>> Adj;
+  igl::adjacency_list(F, Adj);
+  int nb_neighbors = 10;
+  while(nb_neighbors >= 0) {
+      for (int i : added_constraints) {
+          for (int neighbor : Adj[i]) {
+              added_constraints.insert(neighbor);
+          }
+      }
+      nb_neighbors -= 1;
+  }   
+
+  igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
+  igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+
+}
+
+void non_rigid_alignment() {
+  // setup octree and knn
+  int k = 3;
+  vector<vector<int>> point_indices;
+  MatrixXi CH;
+  MatrixXd CN;
+  MatrixXd W;
+  MatrixXi I;
+  igl::octree(Vt, point_indices, CH, CN, W);
+  //igl::knn(Vt, V, k, point_indices, CH, CN, W, KNN);
+
+
+
+  // add nearest neighbors to constraints
+  // make sure we allocate enough memory
+  VectorXi nearest_ind(3*Vt.rows());
+  MatrixXd nearest_pos(3*Vt.rows(), 3);
+  int cnt = 0;
+  for (int i = 0; i < Vt.rows(); i++) {
+    // placeholder for next neighbor to consider
+    int ind = 0;
+    // check if point already in added_constraints
+    if (added_constraintsT.find(i) == added_constraintsT.end() && added_constraints.find(ind) == added_constraints.end(ind)) {
+      nearest_ind(cnt) = i;
+      nearest_pos.row(cnt) = V.row(ind);
+      added_constraints.insert(ind);
+      cnt++;
+    }
+  }
+
+  nearest_ind.conservativeResize(cnt);
+  nearest_pos.conservativeResize(cnt, 3);
+  //----------------------------------------------------------------
+  // ***************************************************************
+  // ---------------------------------------------------------------
+  // More or less same as in assignment4 but with more constraints
+  SparseMatrix<double> A, C, L;
+  VectorXd b(Vt.rows() * 3), d, x_prime,;
+
+  // L_cot*x_prime = L_cot*x
+  igl::cotmatrix(Vt, Ft, L);
+  b << L * Vt.col(0), L * Vt.col(1), L * Vt.col(2);
+  igl::repdiag(L, 3, A);
+
+  VectorXi constraints_ind;
+  MatrixXd constraints_pos;
+  igl::cat(1, nearest_ind, inter_ind, constraints_ind);
+  igl::cat(1, nearest_pos, inter_pos, constraints_pos);
+
+  ConvertConstraintsToMatrixForm(constraints_ind, constraints_pos, C, d);
+
+  SparseMatrix<double> CT = C.transpose();
+  SparseMatrix<double> zeros(C.rows(), C.rows());
+  SparseMatrix<double> LHS, inter1, inter2;
+  VectorXd RHS; 
+
+  zeros.setZero();
+
+  igl::cat(2, A, CT, inter1);
+  igl::cat(2, C, zeros, inter2);
+  igl::cat(1, inter1, inter2, LHS);
+  igl::cat(1, b, d, RHS);
+
+  Eigen::SparseLU <Eigen::SparseMatrix<double>> solver;
+  LHS.makeCompressed();
+  solver.compute(LHS);
+
+  x_prime = solver.solve(RHS);
+
+  Vt.col(0) = x_prime.segment(0, Vt.rows());
+  Vt.col(1) = x_prime.segment(Vt.rows(), Vt.rows());
+  Vt.col(2) = x_prime.segment(2*Vt.rows(), Vt.rows());
+
+  // update landmarkT positions and inter_pos
+  VectorXi boundaryT_ind;
+  MatrixXd boundaryT_pos;
+
+  igl::boundary_loop(Ft, boundaryT_ind);
+  igl::slice(Vt, boundaryT_ind, 1, boundaryT_pos);
+  igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+
+}
+
 
 bool load_mesh(string filename)
 {
@@ -160,13 +342,23 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
 
   if (key == '1') {
     rigid_alignment();
-    MatrixXd VVt(V.rows() + Vt.rows(), 3);
-    MatrixXi FFt(F.rows() + Ft.rows(), 3);
-    VVt << V, Vt;
-    FFt << F, Ft + MatrixXi::Constant(Ft.rows(), 3, V.rows()); // Need to add #V to change vertex indices of template faces
-    viewer.data().clear();
-    viewer.data().set_mesh(VVt, FFt);
   }
 
+  if (key == '2') {
+    if (!prepared) {
+      nra_prep();
+      prepared = true;
+    }
+    // not more than k-1 iterations allowed, as we only calculate k-1 neighbors per vertex
+    non_rigid_alignment();
+  }
+
+  // Display alignment result
+  MatrixXd VVt(V.rows() + Vt.rows(), 3);
+  MatrixXi FFt(F.rows() + Ft.rows(), 3);
+  VVt << V, Vt;
+  FFt << F, Ft + MatrixXi::Constant(Ft.rows(), 3, V.rows()); // Need to add #V to change vertex indices of template faces
+  viewer.data().clear();
+  viewer.data().set_mesh(VVt, FFt);
   return true;
 }
