@@ -1,3 +1,19 @@
+// I couldn't get file_dialog_open to work on macOS, so I'm using the following workaround.
+// For the code to work, there needs to exist a file meshlist.txt in the project folder.
+// This file has to contain the names of all meshes and landmark files that the user wants
+// to be able to load.
+// The name of each of these files should be in a separate line (e.g. alain_normal.obj).
+// On mac at least, this file can be easily created by running
+// ls > ../meshlist.txt
+// from the folder containing the meshes and landmark files.
+// It is assumed that this folder is named "data" (without quotes). Otherwise, the variable
+// pathtomeshes (defined below) has to be changed.
+
+// Once this file is created, it is possible to go through all the meshes in the list
+// linearly by pressing "Load next mesh" or "Load previous mesh" buttons.
+// The original meshlist.txt contains the names of all meshes and landmark files from
+// all_data/scanned_faces_cleaned
+
 #include <igl/read_triangle_mesh.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
@@ -152,6 +168,55 @@ bool load_mesh(string filename)
     return true;
 }
 
+
+std::vector<string> meshlist;
+std::vector<string> landmarklist;
+
+std::vector<string>::iterator current_mesh;
+bool first_init;
+std::string pathtomeshes = "../data/"; // eg. ../data/
+std::string meshlistpath = "../meshlist.txt";
+
+
+// updatemeshlist reads the file specified by meshlistpath and puts all the .obj files
+// into meshlist vector and all the .landmark files into the landmarklist vector.
+void updatemeshlist () {
+    meshlist.clear();
+    landmarklist.clear();
+
+    std::ifstream myfile(meshlistpath);
+
+    string line;
+
+    if (myfile.is_open()) {
+        while ( getline (myfile,line) ) {
+            std::size_t found = line.find_last_of(".");
+            string filename = line.substr(0, found);
+            string extension = line.substr(found + 1);
+
+            if (extension == "obj") {
+                meshlist.push_back(filename);
+            }
+            else if (extension == "landmark") {
+                landmarklist.push_back(filename);
+            }
+            else cout << line << " has unknown extension." << std::endl;
+
+        }
+        myfile.close();
+    }
+    else cout << "Unable to open file";
+
+    std::cout << "Total number of meshes: " << meshlist.size()
+            << "\nNumber of landmark files: " << landmarklist.size()
+              << std::endl;
+
+    if (!first_init) {
+        current_mesh = find(meshlist.begin(), meshlist.end(), *current_mesh);
+    }
+
+}
+
 int main(int argc, char* argv[])
 {
     igl::opengl::glfw::imgui::ImGuiMenu menu;
@@ -159,6 +224,19 @@ int main(int argc, char* argv[])
 
     // Prevents weird crashes
     load_mesh("");
+
+    first_init = 1;
+    updatemeshlist();
+    first_init = 0;
+
+    current_mesh = meshlist.begin();
+
+    latestMeshFileLoaded = *current_mesh;
+    latestMeshFileLoaded.append(".obj");
+    latestMeshFileLoaded.insert(0,pathtomeshes);
+    load_mesh(latestMeshFileLoaded);
+    std::cout << "Loaded mesh " << latestMeshFileLoaded << std::endl;
+
 
     menu.callback_draw_viewer_menu = [&]()
     {
@@ -225,10 +303,98 @@ int main(int argc, char* argv[])
 
             ImGui::Text("Files and mesh");
             // ToDo - Find a way to select folder and go through iteratively
-            if (ImGui::Button("Load new mesh", ImVec2(-1, 0)))
+            // if (ImGui::Button("Load new mesh", ImVec2(-1, 0)))
+            if (ImGui::Button("Load next mesh", ImVec2(-1, 0)))
             {
-                latestMeshFileLoaded = igl::file_dialog_open();
+                // latestMeshFileLoaded = igl::file_dialog_open();
+
+                if (current_mesh < meshlist.end()) {
+                    current_mesh++;
+                }
+                else {
+                    std::cout << "There are no more meshes. " << std::endl;
+                }
+
+                latestMeshFileLoaded = *current_mesh;
+                latestMeshFileLoaded.append(".obj");
+                latestMeshFileLoaded.insert(0,pathtomeshes);
                 load_mesh(latestMeshFileLoaded);
+
+                std::cout << "Loaded mesh " << latestMeshFileLoaded << std::endl;
+
+                // Remove all landmarks
+                landmarks.clear();
+                landmark_positions.resize(0, 3);
+
+                handle_id.setConstant(V.rows(), 1, -1);
+
+                // Update points
+                viewer.data().set_points(landmark_positions, Eigen::RowVector3d(1, 0, 0));
+
+                // Remove all labels
+                viewer.data().labels_positions.resize(0, 3);
+                viewer.data().labels_strings.clear();
+            }
+            if (ImGui::Button("Load previous mesh", ImVec2(-1, 0)))
+            {
+                // latestMeshFileLoaded = igl::file_dialog_open();
+
+                if (current_mesh > meshlist.begin()) {
+                    current_mesh--;
+                }
+                else {
+                    std::cout << "There are no more meshes. " << std::endl;
+                }
+
+                latestMeshFileLoaded = *current_mesh;
+                latestMeshFileLoaded.append(".obj");
+                latestMeshFileLoaded.insert(0,pathtomeshes);
+                load_mesh(latestMeshFileLoaded);
+
+                std::cout << "Loaded mesh " << latestMeshFileLoaded << std::endl;
+
+                // Remove all landmarks
+                landmarks.clear();
+                landmark_positions.resize(0, 3);
+
+                handle_id.setConstant(V.rows(), 1, -1);
+
+                // Update points
+                viewer.data().set_points(landmark_positions, Eigen::RowVector3d(1, 0, 0));
+
+                // Remove all labels
+                viewer.data().labels_positions.resize(0, 3);
+                viewer.data().labels_strings.clear();
+            }
+            if (ImGui::Button("Load next unprocessed mesh", ImVec2(-1, 0)))
+            {
+                // latestMeshFileLoaded = igl::file_dialog_open();
+                //
+                if (current_mesh < meshlist.end()) {
+                    current_mesh++;
+                }
+                else {
+                    std::cout << "There are no more meshes. " << std::endl;
+                }
+
+                for (auto landmark = landmarklist.begin(); landmark < landmarklist.end(); ++landmark) {
+                    if (*landmark != *current_mesh)
+                        continue;
+                    else {
+                        if (current_mesh < meshlist.end()) {
+                            current_mesh++;
+                            landmark = landmarklist.begin();
+                        }
+                        else {
+                            std::cout << "All meshes are processed." << std::endl;
+                        }
+                    }
+                }
+                latestMeshFileLoaded = *current_mesh;
+                latestMeshFileLoaded.append(".obj");
+                latestMeshFileLoaded.insert(0,pathtomeshes);
+                load_mesh(latestMeshFileLoaded);
+
 
                 // Remove all landmarks
                 landmarks.clear();
@@ -246,7 +412,27 @@ int main(int argc, char* argv[])
 
             if (ImGui::Button("Load landmark file", ImVec2(-1, 0)))
             {
-                latestLandmarkFileLoaded = igl::file_dialog_open();
+                updatemeshlist();
+
+                string current_mesh_name = *current_mesh;
+                if (find(landmarklist.begin(), landmarklist.end(), *current_mesh)!=landmarklist.end()) {
+                    latestLandmarkFileLoaded = *current_mesh; //igl::file_dialog_open();
+                    latestLandmarkFileLoaded.append(".landmark");
+                    latestLandmarkFileLoaded.insert(0,pathtomeshes);
+                    std::cout << "Loaded the landmark file " << latestLandmarkFileLoaded << std::endl;
+                }
+                else if (find(landmarklist.begin(),
+                              landmarklist.end(),
+                              current_mesh_name.substr(0, current_mesh_name.length()-9))
+                              !=landmarklist.end()) {
+                    latestLandmarkFileLoaded = current_mesh_name.substr(0, current_mesh_name.length()-9); //igl::file_dialog_open();
+                    latestLandmarkFileLoaded.append(".landmark");
+                    latestLandmarkFileLoaded.insert(0,pathtomeshes);
+                    std::cout << "Loaded the landmark file " << latestLandmarkFileLoaded << std::endl;
+                }
+                else {
+                    std::cout << "Can't find the landmark file. " << std::endl;
+                }
 
                 // Remove all landmarks
                 landmarks.clear();
@@ -285,10 +471,30 @@ int main(int argc, char* argv[])
                 }
             }
 
-            if (ImGui::Button("Save mesh and landmarks", ImVec2(-1, 0)))
+            if (ImGui::Button("Save landmarks", ImVec2(-1, 0)))
             {
                 // Credits to https://stackoverflow.com/questions/4643512/replace-substring-with-another-substring-c - based on their implementation
 
+                int endingIndex = -1;
+                endingIndex = latestMeshFileLoaded.find(".obj");
+
+                std::string fileToSaveLandmarks = latestMeshFileLoaded;
+                fileToSaveLandmarks.replace(endingIndex, 4, ".landmark");
+
+                ofstream landmarkFileStream(fileToSaveLandmarks);
+                for (const pair<int, int>& landmark : landmarks)
+                {
+                    landmarkFileStream << landmark.first << " " << landmark.second << "\n";
+                }
+
+                landmarkFileStream.close();
+
+                // cout << "Files succesfully saved to: " + fileToSaveSmoothed << " and " << fileToSaveLandmarks << endl;
+                cout << "File succesfully saved to: " << fileToSaveLandmarks << endl;
+            }
+            if (ImGui::Button("Save mesh and landmarks", ImVec2(-1, 0)))
+            {
+                // Credits to https://stackoverflow.com/questions/4643512/replace-substring-with-another-substring-c - based on their implementation
 
                 int endingIndex = -1;
                 endingIndex = latestMeshFileLoaded.find(".obj");
@@ -734,9 +940,9 @@ bool callback_pre_draw(Viewer& viewer)
 bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
 {
   bool handled = false;
-  
+
   // Could add shortcuts if people want them
-  
+
   /*
   if (key == 'S')
   {
@@ -761,7 +967,7 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
     callback_key_down(viewer, '1', 0);
     handled = true;
   }
-  
+
   //viewer.ngui->refresh();
   return handled;
 }
