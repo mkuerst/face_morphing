@@ -1,8 +1,7 @@
 #include <igl/read_triangle_mesh.h>
 #include <igl/get_seconds.h>
 #include <igl/material_colors.h>
-#include <igl/copyleft/marching_cubes.h>
-#include <igl/copyleft/swept_volume.h>
+#include <igl/swept_volume.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/PI.h>
 #include <Eigen/Core>
@@ -34,12 +33,12 @@ int main(int argc, char * argv[])
   igl::opengl::glfw::Viewer viewer;
   viewer.data().set_mesh(V,F);
   viewer.data().set_face_based(true);
-  viewer.core.is_animating = !show_swept_volume;
+  viewer.core().is_animating = !show_swept_volume;
   const int grid_size = 50;
   const int time_steps = 200;
   const double isolevel = 0.1;
   std::cerr<<"Computing swept volume...";
-  igl::copyleft::swept_volume(
+  igl::swept_volume(
     V,F,transform,time_steps,grid_size,isolevel,SV,SF);
   std::cerr<<" finished."<<std::endl;
 
@@ -79,7 +78,7 @@ int main(int argc, char * argv[])
           {
             viewer.data().set_mesh(V,F);
           }
-          viewer.core.is_animating = !show_swept_volume;
+          viewer.core().is_animating = !show_swept_volume;
           viewer.data().set_face_based(true);
           break;
       }

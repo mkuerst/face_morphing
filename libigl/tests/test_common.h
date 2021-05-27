@@ -1,12 +1,14 @@
 #pragma once
 
-
+// These are not directly used but would otherwise be included in most files.
+// Leaving them included here.
 #include <igl/read_triangle_mesh.h>
-#include <igl/find.h>
 #include <igl/readDMAT.h>
 
+#include <igl/find.h>
+
 #include <Eigen/Core>
-#include <gtest/gtest.h>
+#include <catch2/catch.hpp>
 
 #include <cctype>
 #include <string>
@@ -14,23 +16,61 @@
 #include <algorithm>
 #include <tuple>
 
-namespace test_common 
+
+// Disable lengthy tests in debug mode
+#ifdef NDEBUG
+#define IGL_DEBUG_OFF ""
+#else
+#define IGL_DEBUG_OFF "[!hide]"
+#endif
+
+
+#include <igl/STR.h>
+template<>
+struct Catch::StringMaker<std::tuple<int,int,int> > 
 {
-  // Input:
-  //   s  arbitrary string
-  // Returns s with all non-alphanumeric characters replaced with underscores '_'
-  inline std::string safe_test_name(std::string s)
-  {
-    std::for_each(s.begin(),s.end(),[](char &c){if(!std::isalnum(c)) c='_';});
-    return s;
-  };
-  inline std::string string_test_name(const ::testing::TestParamInfo<std::string>& info)
-  {
-    return test_common::safe_test_name(info.param);
-  };
-  inline std::vector<std::string> closed_genus_0_meshes()
+  static std::string convert(std::tuple<int,int,int> const& t)
   {
     return 
+      STR("("<<std::get<0>(t)<<","<<std::get<1>(t)<<","<<std::get<2>(t)<<")");
+  }
+};
+template<>
+struct Catch::StringMaker<std::tuple<int,int,double> > 
+{
+  static std::string convert(std::tuple<int,int,double> const& t)
+  {
+    return 
+      STR("("<<std::get<0>(t)<<","<<std::get<1>(t)<<","<<std::get<2>(t)<<")");
+  }
+};
+
+
+namespace test_common
+{
+  template<typename Param, typename Fun>
+  void run_test_cases(const std::vector<Param> &params,  Fun test_case)
+  {
+    for(const auto &p : params)
+    {
+      // Can't use INFO( p ) because we're not sure how to print p
+      test_case(p);
+    }
+  }
+
+  template<typename Fun>
+  void run_test_cases(const std::vector<std::string> &params,  Fun test_case)
+  {
+    for(const auto &p : params)
+    {
+      INFO( p );
+      test_case(p);
+    }
+  }
+
+  inline std::vector<std::string> closed_genus_0_meshes()
+  {
+    return
     {
       "cube.obj",
       "decimated-knight.obj",
@@ -60,7 +100,7 @@ namespace test_common
   };
   inline std::vector<std::string> tet_meshes()
   {
-    return 
+    return
     {
       "decimated-knight.mesh"
     };
@@ -79,36 +119,14 @@ namespace test_common
     return std::string(LIBIGL_DATA_DIR) + "/" + s;
   };
 
-  // TODO: this seems like a pointless indirection. Should just find and
-  // replace test_common::load_mesh(X,...) with
-  // igl::read_triangle_mesh(test_common::data_path(X),...)
-  template<typename DerivedV, typename DerivedF>
-  void load_mesh(
-    const std::string& filename, 
-    Eigen::PlainObjectBase<DerivedV>& V,
-    Eigen::PlainObjectBase<DerivedF>& F)
-  {
-    igl::read_triangle_mesh(data_path(filename), V, F);
-  }
-
-  // TODO: this seems like a pointless indirection. Should just find and
-  // replace test_common::load_matrix(X,...) with
-  // igl::readDMAT(test_common::data_path(X),...)
-  template<typename Derived>
-  void load_matrix(
-    const std::string& filename,
-    Eigen::PlainObjectBase<Derived>& M) 
-  {
-    igl::readDMAT(data_path(filename), M);
-  }
   template <typename DerivedA, typename DerivedB>
   void assert_eq(
     const Eigen::MatrixBase<DerivedA> & A,
     const Eigen::MatrixBase<DerivedB> & B)
   {
     // Sizes should match
-    ASSERT_EQ(A.rows(),B.rows());
-    ASSERT_EQ(A.cols(),B.cols());
+    REQUIRE(A.rows() == B.rows());
+    REQUIRE(A.cols() == B.cols());
     for(int i = 0;i<A.rows();i++)
     {
       for(int j = 0;j<A.cols();j++)
@@ -117,18 +135,41 @@ namespace test_common
         // know where the disagreement is.
         std::tuple<int,int,typename DerivedA::Scalar> Aijv {i,j,A(i,j)};
         std::tuple<int,int,typename DerivedB::Scalar> Bijv {i,j,B(i,j)};
-        ASSERT_EQ(Aijv,Bijv);
+        REQUIRE(Aijv == Bijv);
       }
     }
   }
+
+  template <typename DerivedA, typename DerivedB>
+  void assert_neq(
+    const Eigen::MatrixBase<DerivedA> & A,
+    const Eigen::MatrixBase<DerivedB> & B)
+  {
+    // Sizes should match
+    REQUIRE(A.rows() == B.rows());
+    REQUIRE(A.cols() == B.cols());
+    bool all_equals = true;
+    for(int i = 0;i<A.rows();i++)
+    {
+      for(int j = 0;j<A.cols();j++)
+      {
+        if (A(i,j) != B(i,j))
+        {
+          all_equals = false;
+        }
+      }
+    }
+    REQUIRE_FALSE(all_equals);
+  }
+
   template <typename DerivedA, typename DerivedB>
   void assert_eq(
     const Eigen::SparseMatrix<DerivedA> & A,
     const Eigen::SparseMatrix<DerivedB> & B)
   {
     // Sizes should match
-    ASSERT_EQ(A.rows(),B.rows());
-    ASSERT_EQ(A.cols(),B.cols());
+    REQUIRE(A.rows() == B.rows());
+    REQUIRE(A.cols() == B.cols());
     Eigen::Matrix<long int,Eigen::Dynamic, 1> AI,AJ;
     Eigen::Matrix<long int,Eigen::Dynamic, 1> BI,BJ;
     Eigen::Matrix<DerivedA,Eigen::Dynamic, 1> AV;
@@ -150,8 +191,8 @@ namespace test_common
     const EpsType & eps)
   {
     // Sizes should match
-    ASSERT_EQ(A.rows(),B.rows());
-    ASSERT_EQ(A.cols(),B.cols());
+    REQUIRE(A.rows() == B.rows());
+    REQUIRE(A.cols() == B.cols());
     for(int i = 0;i<A.rows();i++)
     {
       for(int j = 0;j<A.cols();j++)
@@ -160,15 +201,18 @@ namespace test_common
         // know where the disagreement is.
         //
         // Equivalent to ASSERT_NEAR(Aijv,Bijv)
+
+        CAPTURE( i );
+        CAPTURE( j );
         {
-          std::tuple<int,int,typename DerivedA::Scalar> Aijv {i,j,A(i,j)};
-          std::tuple<int,int,typename DerivedB::Scalar> Bijv {i,j,B(i,j)+eps};
-          ASSERT_LT(Aijv,Bijv);
+          // std::tuple<int,int,typename DerivedA::Scalar> Aijv {i,j,A(i,j)};
+          // std::tuple<int,int,typename DerivedB::Scalar> Bijv {i,j,B(i,j)+eps};
+          REQUIRE(A(i,j) < B(i,j)+eps);
         }
         {
-          std::tuple<int,int,typename DerivedA::Scalar> Aijv {i,j,A(i,j)+eps};
-          std::tuple<int,int,typename DerivedB::Scalar> Bijv {i,j,B(i,j)};
-          ASSERT_GT(Aijv,Bijv);
+          // std::tuple<int,int,typename DerivedA::Scalar> Aijv {i,j,A(i,j)+eps};
+          // std::tuple<int,int,typename DerivedB::Scalar> Bijv {i,j,B(i,j)};
+          REQUIRE(A(i,j)+eps > B(i,j));
         }
       }
     }

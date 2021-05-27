@@ -13,6 +13,7 @@
 #include <igl/cat.h>
 #include <unordered_set>
 
+
 using namespace std;
 using namespace Eigen;
 using Viewer = igl::opengl::glfw::Viewer;
@@ -48,7 +49,22 @@ MatrixXi KNN;
 unordered_set<int> added_constraintsT;
 unordered_set<int> added_constraints;
 
+VectorXi boundaryT_ind;
+MatrixXd boundaryT_pos;
+
+VectorXi boundary_ind;
+MatrixXd boundary_pos;
+
+// octree stuff
+vector<vector<int>> point_indices;
+MatrixXi CH;
+MatrixXd CN;
+MatrixXd W;
+
 bool prepared = false;
+bool init_knn = false;
+int it = 1;
+int cnt = 0;
 
 bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers);
 
@@ -137,27 +153,24 @@ void ConvertConstraintsToMatrixForm(VectorXi indices, MatrixXd positions, Eigen:
 {
 	// Convert the list of fixed indices and their fixed positions to a linear system
 	// Hint: The matrix C should contain only one non-zero element per row and d should contain the positions in the correct order.
+  double lambda = 1.;
 	std::vector<Eigen::Triplet<double> > tripletList;
 	C.resize(indices.rows()*3, Vt.rows()*3);
 	d.resize(3 * indices.size());
+  cout << "size of indices vector: " << indices.size() << endl;
 	for (int i = 0; i < indices.size(); i++) {
-		tripletList.push_back(Eigen::Triplet<double>(i, indices(i), 1.));
-		tripletList.push_back(Eigen::Triplet<double>(indices.rows()+i, Vt.rows()+indices(i), 1.));
-    tripletList.push_back(Eigen::Triplet<double>(2 * indices.rows()+i, 2 * Vt.rows()+indices(i), 1.));
-		d(i) = positions(i, 0);
-		d(i + indices.rows()) = positions(i, 1);
-    d(i + 2 * indices.rows()) = positions(i, 2);
+		tripletList.push_back(Eigen::Triplet<double>(i, indices(i), lambda*1.));
+		tripletList.push_back(Eigen::Triplet<double>(indices.rows()+i, Vt.rows()+indices(i), lambda*1.));
+    tripletList.push_back(Eigen::Triplet<double>(2 * indices.rows()+i, 2 * Vt.rows()+indices(i), lambda*1.));
+		d(i) = lambda*positions(i, 0);
+		d(i + indices.rows()) = lambda*positions(i, 1);
+    d(i + 2 * indices.rows()) = lambda*positions(i, 2);
 	}
 	C.setFromTriplets(tripletList.begin(), tripletList.end());
 }
 
 
-void nra_prep(int k=5) {
-  
-  // store scan boundary into boundary_pos
-  VectorXi boundary_ind;
-  MatrixXd boundary_pos;
-
+void nra_prep() {
   igl::boundary_loop(F, boundary_ind);
   igl::slice(V, boundary_ind, 1, boundary_pos);
 
@@ -169,99 +182,119 @@ void nra_prep(int k=5) {
   for (int i=0; i<landmarks.rows(); i++) {
     added_constraints.insert(landmarks(i));
   }
-
-  // store template boundary into boundaryT_pos
-  VectorXi boundaryT_ind;
-  MatrixXd boundaryT_pos;
+  cout << "reached scan boundary" << endl;
 
   igl::boundary_loop(Ft, boundaryT_ind);
   igl::slice(Vt, boundaryT_ind, 1, boundaryT_pos);
 
 
-  // add template landmarks and boundary as constraints
-  for (int i=0; i<landmarksT.rows(); i++) 
+  // add template landmarks and boundary as constraint
+  for (int i=0; i<landmarksT.rows(); i++) {
     added_constraintsT.insert(landmarksT(i));
+  }
 
-  for (int i=0; i<boundary_ind.rows(); i++) 
-      added_constraintsT.insert(boundaryT_ind(i));
+  for (int i=0; i<boundary_ind.rows(); i++) {
+    added_constraintsT.insert(boundaryT_ind(i));
+  }
 
-
-  // add neighbors of boundary points
-  vector<vector<int>> Adj;
-  igl::adjacency_list(F, Adj);
-  int nb_neighbors = 10;
-  while(nb_neighbors >= 0) {
-      for (int i : added_constraints) {
-          for (int neighbor : Adj[i]) {
-              added_constraints.insert(neighbor);
-          }
-      }
-      nb_neighbors -= 1;
-  }   
+  cout << "reached template boundary" << endl;
+  //add neighbors of boundary points
+  // vector<vector<int>> Adj;
+  // igl::adjacency_list(F, Adj);
+  // int nb_neighbors = 0;
+  // while(nb_neighbors > 0) {
+  //     for (int i : added_constraints) {
+  //         for (int neighbor : Adj[i]) {
+  //             added_constraints.insert(neighbor);
+  //             //cout << "added neigbor: " << neighbor << endl;
+  //         }
+  //     }
+  //     nb_neighbors--;
+  // }   
 
   igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
   igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
 
+  cout << "reached neighbors to boundary" << endl;
+
+  // setup octree
+  igl::octree(V, point_indices, CH, CN, W);
+
+  cout << "reached octree" << endl;
 }
 
-void non_rigid_alignment() {
-  // setup octree and knn
-  int k = 3;
-  vector<vector<int>> point_indices;
-  MatrixXi CH;
-  MatrixXd CN;
-  MatrixXd W;
-  MatrixXi I;
-  igl::octree(Vt, point_indices, CH, CN, W);
-  //igl::knn(Vt, V, k, point_indices, CH, CN, W, KNN);
 
-
-
-  // add nearest neighbors to constraints
-  // make sure we allocate enough memory
-  VectorXi nearest_ind(3*Vt.rows());
-  MatrixXd nearest_pos(3*Vt.rows(), 3);
-  int cnt = 0;
-  for (int i = 0; i < Vt.rows(); i++) {
-    // placeholder for next neighbor to consider
-    int ind = 0;
-    // check if point already in added_constraints
-    if (added_constraintsT.find(i) == added_constraintsT.end() && added_constraints.find(ind) == added_constraints.end(ind)) {
-      nearest_ind(cnt) = i;
-      nearest_pos.row(cnt) = V.row(ind);
-      added_constraints.insert(ind);
-      cnt++;
+void non_rigid_alignment(int it=1) {
+  
+  
+  VectorXi nearest_ind(Vt.rows());
+  MatrixXd nearest_pos(Vt.rows(), 3);
+  if (it > 1) {
+    // calculate knn
+    int k = 20;
+    if (!init_knn) {
+      igl::knn(Vt, V, k, point_indices, CH, CN, W, KNN);
+      cout << "reached knn" << endl;
+      init_knn = true;
     }
+    
+    // add nearest neighbors to constraints
+    int cnt = 0;
+    int ind;
+    for (int i = 0; i < Vt.rows(); i++) {
+      // placeholder for next neighbor to consider
+      
+      //for (int j=1;j<k;j++) {
+        ind = KNN(i, it-1);
+        // check if point already in added_constraints
+        if (added_constraintsT.find(i) == added_constraintsT.end() && added_constraints.find(ind) == added_constraints.end()) {
+          //cout << "added vertex: " << ind << endl;
+          nearest_ind(cnt) = i;
+          nearest_pos.row(cnt) = V.row(ind);
+          added_constraints.insert(ind);
+          cnt++;
+        }
+      //}
+    }
+
+    nearest_ind.conservativeResize(cnt);
+    nearest_pos.conservativeResize(cnt, 3);
+    cout << "reached nearest pts" << endl;
   }
 
-  nearest_ind.conservativeResize(cnt);
-  nearest_pos.conservativeResize(cnt, 3);
   //----------------------------------------------------------------
   // ***************************************************************
   // ---------------------------------------------------------------
   // More or less same as in assignment4 but with more constraints
   SparseMatrix<double> A, C, L;
-  VectorXd b(Vt.rows() * 3), d, x_prime,;
+  VectorXd b(Vt.rows() * 3), d, x_prime;
 
   // L_cot*x_prime = L_cot*x
   igl::cotmatrix(Vt, Ft, L);
   b << L * Vt.col(0), L * Vt.col(1), L * Vt.col(2);
   igl::repdiag(L, 3, A);
-
+  cout << "reached your favorite laplacian" << endl;
+  
   VectorXi constraints_ind;
   MatrixXd constraints_pos;
-  igl::cat(1, nearest_ind, inter_ind, constraints_ind);
-  igl::cat(1, nearest_pos, inter_pos, constraints_pos);
-
+  if (init_knn) {
+    igl::cat(1, nearest_ind, inter_ind, constraints_ind);
+    igl::cat(1, nearest_pos, inter_pos, constraints_pos);
+  }
+  else {
+    constraints_ind = inter_ind;
+    constraints_pos = inter_pos;
+  }
+  cout << "reached constraint_pts" << endl;
   ConvertConstraintsToMatrixForm(constraints_ind, constraints_pos, C, d);
+  cout << "reached converted constraints to matrix" << endl;
 
   SparseMatrix<double> CT = C.transpose();
-  SparseMatrix<double> zeros(C.rows(), C.rows());
+  SparseMatrix<double> zeros(C.rows(), CT.cols()/*C.rows()*/);
   SparseMatrix<double> LHS, inter1, inter2;
   VectorXd RHS; 
 
   zeros.setZero();
-
   igl::cat(2, A, CT, inter1);
   igl::cat(2, C, zeros, inter2);
   igl::cat(1, inter1, inter2, LHS);
@@ -270,22 +303,26 @@ void non_rigid_alignment() {
   Eigen::SparseLU <Eigen::SparseMatrix<double>> solver;
   LHS.makeCompressed();
   solver.compute(LHS);
-
+  cout << "reached prefactor system" << endl;
   x_prime = solver.solve(RHS);
+  cout << "size 3*Vt.rows(): " << 3*Vt.rows() << endl;
+  cout << "size x_prime: " << x_prime.size() << endl; 
 
   Vt.col(0) = x_prime.segment(0, Vt.rows());
   Vt.col(1) = x_prime.segment(Vt.rows(), Vt.rows());
   Vt.col(2) = x_prime.segment(2*Vt.rows(), Vt.rows());
 
   // update landmarkT positions and inter_pos
-  VectorXi boundaryT_ind;
-  MatrixXd boundaryT_pos;
+  // VectorXi boundaryT_ind;
+  // MatrixXd boundaryT_pos;
 
-  igl::boundary_loop(Ft, boundaryT_ind);
-  igl::slice(Vt, boundaryT_ind, 1, boundaryT_pos);
-  igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+  // igl::boundary_loop(Ft, boundaryT_ind);
+  // igl::slice(Vt, boundaryT_ind, 1, boundaryT_pos);
+  // igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+  cout << "reached end of non-rigid-alignment" << endl;
 
 }
+
 
 
 bool load_mesh(string filename)
@@ -294,7 +331,7 @@ bool load_mesh(string filename)
   viewer.data().clear();
   viewer.data().set_mesh(V, F);
 
-  viewer.core.align_camera_center(V);
+  //viewer.core.align_camera_center(V); // incompatible with newer igl version
   V_cp = V;
   return true;
 }
@@ -333,7 +370,7 @@ int main(int argc, char *argv[])
   viewer.callback_key_down = callback_key_down;
 
   viewer.data().point_size = 10;
-  viewer.core.set_rotation_type(igl::opengl::ViewerCore::ROTATION_TYPE_TRACKBALL);
+  //viewer.core.set_rotation_type(igl::opengl::ViewerCore::ROTATION_TYPE_TRACKBALL); // incompatible with newer igl version
   viewer.launch();
 }
 
@@ -347,10 +384,11 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
   if (key == '2') {
     if (!prepared) {
       nra_prep();
+      cout << "preparation for non_rigid_alignment done!" << endl;
       prepared = true;
     }
-    // not more than k-1 iterations allowed, as we only calculate k-1 neighbors per vertex
-    non_rigid_alignment();
+    non_rigid_alignment(it);
+    it++;
   }
 
   // Display alignment result
@@ -359,6 +397,6 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
   VVt << V, Vt;
   FFt << F, Ft + MatrixXi::Constant(Ft.rows(), 3, V.rows()); // Need to add #V to change vertex indices of template faces
   viewer.data().clear();
-  viewer.data().set_mesh(VVt, FFt);
+  viewer.data().set_mesh(Vt, Ft);
   return true;
 }

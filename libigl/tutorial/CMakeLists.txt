@@ -1,26 +1,24 @@
 cmake_minimum_required(VERSION 3.1)
 project(libigl_tutorials)
 
-### conditionally compile certain modules depending on libraries found on the system		
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake)		
-	
-### Adding libIGL: choose the path to your local copy libIGL		
-if(NOT TARGET igl_common)		
-  include(libigl)		
-else()		
-  include(LibiglDownloadExternal)		
+### Conditionally compile certain modules depending on libraries found on the system
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake)
+
+### Compile libigl in header-only mode for Python bindings
+option(LIBIGL_USE_STATIC_LIBRARY "Use LibIGL as static library" ON)
+
+### Adding libIGL: choose the path to your local copy libIGL
+if(NOT TARGET igl_common)
+  include(libigl)
+else()
+  include(LibiglDownloadExternal)
 endif()
 
 ### Download data
 igl_download_tutorial_data()
 
 ### Output directories
-if(MSVC)
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR})
-else()
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "../")
-endif()
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 ### Choose which chapters to compile
 option(TUTORIALS_CHAPTER1 "Compile chapter 1" ON)
@@ -52,11 +50,17 @@ if(TUTORIALS_CHAPTER1)
   add_subdirectory("102_DrawMesh")
   add_subdirectory("103_Events")
   add_subdirectory("104_Colors")
-  add_subdirectory("105_Overlays")
   if(LIBIGL_WITH_OPENGL_GLFW_IMGUI)
+    add_subdirectory("105_Overlays")
     add_subdirectory("106_ViewerMenu")
   endif()
   add_subdirectory("107_MultipleMeshes")
+  add_subdirectory("108_MultipleViews")
+  if(LIBIGL_WITH_OPENGL_GLFW_IMGUI)
+    add_subdirectory("109_ImGuizmo")
+    add_subdirectory("112_Selection")
+  endif()
+  add_subdirectory("110_MshView")
 endif()
 
 # Chapter 2
@@ -67,6 +71,7 @@ if(TUTORIALS_CHAPTER2)
   add_subdirectory("204_Gradient")
   add_subdirectory("205_Laplacian")
   add_subdirectory("206_GeodesicDistance")
+  add_subdirectory("207_PolygonLaplacian")
 endif()
 
 # Chapter 3
@@ -88,6 +93,10 @@ if(TUTORIALS_CHAPTER4)
   add_subdirectory("405_AsRigidAsPossible")
   add_subdirectory("406_FastAutomaticSkinningTransformations")
   add_subdirectory("407_BiharmonicCoordinates")
+  add_subdirectory("408_DirectDeltaMush")
+  if(LIBIGL_WITH_OPENGL_GLFW_IMGUI)
+	  add_subdirectory("409_Kelvinlets")
+  endif()
 endif()
 
 # Chapter 5
@@ -121,7 +130,11 @@ if(TUTORIALS_CHAPTER6)
     add_subdirectory("606_AmbientOcclusion")
   endif()
   if(LIBIGL_WITH_PNG)
+    add_subdirectory("111_MatCap")
     add_subdirectory("607_ScreenCapture")
+  endif()
+  if(LIBIGL_WITH_PNG AND LIBIGL_WITH_EMBREE)
+    add_subdirectory("608_RayTrace")
   endif()
   if(LIBIGL_WITH_CGAL)
     add_subdirectory("609_Boolean")
@@ -143,7 +156,7 @@ if(TUTORIALS_CHAPTER7)
   add_subdirectory("708_Picking")
   add_subdirectory("709_SLIM")
   if(LIBIGL_WITH_TRIANGLE)
-    add_subdirectory("710_SCAF")
+  add_subdirectory("710_SCAF")
   endif()
   add_subdirectory("711_Subdivision")
   add_subdirectory("712_DataSmoothing")
@@ -152,4 +165,13 @@ if(TUTORIALS_CHAPTER7)
     add_subdirectory("714_MarchingTets")
   endif()
   add_subdirectory("715_MeshImplicitFunction")
+  add_subdirectory("716_HeatGeodesics")
+  if(LIBIGL_WITH_CGAL)
+    add_subdirectory("717_FastWindingNumber")
+  endif()
+  add_subdirectory("718_IterativeClosestPoint")
+  add_subdirectory("719_ExplodedView")
+  add_subdirectory("720_BlueNoise")
+  add_subdirectory("721_VectorFieldSmoothing")
+  add_subdirectory("722_VectorParallelTransport")
 endif()
