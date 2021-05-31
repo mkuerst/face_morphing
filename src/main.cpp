@@ -61,10 +61,15 @@ MatrixXi CH;
 MatrixXd CN;
 MatrixXd W;
 
+// Implicitly smoothed array, #Vx3
+Eigen::MatrixXd Vt_impLap;
+
+
 bool prepared = false;
 bool init_knn = false;
 int it = 1;
 int cnt = 0;
+double threshold = 0.4;
 
 bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers);
 
@@ -201,7 +206,7 @@ void nra_prep() {
   //add neighbors of boundary points
   // vector<vector<int>> Adj;
   // igl::adjacency_list(F, Adj);
-  // int nb_neighbors = 0;
+  // int nb_neighbors = 1;
   // while(nb_neighbors > 0) {
   //     for (int i : added_constraints) {
   //         for (int neighbor : Adj[i]) {
@@ -212,8 +217,10 @@ void nra_prep() {
   //     nb_neighbors--;
   // }   
 
-  igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
-  igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+  // igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
+  // igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+  inter_ind = landmarksT;
+  inter_pos = landmarks_pos;
 
   cout << "reached neighbors to boundary" << endl;
 
@@ -225,7 +232,10 @@ void nra_prep() {
 
 
 void non_rigid_alignment(int it=1) {
-  
+  if (it == 10) {
+    // igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
+    // igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+  }
   
   VectorXi nearest_ind(Vt.rows());
   MatrixXd nearest_pos(Vt.rows(), 3);
@@ -242,19 +252,16 @@ void non_rigid_alignment(int it=1) {
     int cnt = 0;
     int ind;
     for (int i = 0; i < Vt.rows(); i++) {
-      // placeholder for next neighbor to consider
-      
-      //for (int j=1;j<k;j++) {
-        ind = KNN(i, it-1);
+        ind = KNN(i, 1);
+        double dist = (Vt.row(i) - V.row(ind)).norm();
         // check if point already in added_constraints
-        if (added_constraintsT.find(i) == added_constraintsT.end() && added_constraints.find(ind) == added_constraints.end()) {
+        if (added_constraintsT.find(i) == added_constraintsT.end() && added_constraints.find(ind) == added_constraints.end() && dist < threshold) {
           //cout << "added vertex: " << ind << endl;
           nearest_ind(cnt) = i;
           nearest_pos.row(cnt) = V.row(ind);
           added_constraints.insert(ind);
           cnt++;
         }
-      //}
     }
 
     nearest_ind.conservativeResize(cnt);
@@ -274,9 +281,10 @@ void non_rigid_alignment(int it=1) {
   b << L * Vt.col(0), L * Vt.col(1), L * Vt.col(2);
   igl::repdiag(L, 3, A);
   cout << "reached your favorite laplacian" << endl;
-  
+
   VectorXi constraints_ind;
   MatrixXd constraints_pos;
+  
   if (init_knn) {
     igl::cat(1, nearest_ind, inter_ind, constraints_ind);
     igl::cat(1, nearest_pos, inter_pos, constraints_pos);
@@ -321,6 +329,42 @@ void non_rigid_alignment(int it=1) {
   // igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
   cout << "reached end of non-rigid-alignment" << endl;
 
+}
+
+void smooth() {
+  double step = 0.000008;
+  Eigen::SparseMatrix<double> L;
+  igl::cotmatrix(Vt, Ft, L);
+  cout << "smoothing cot" << endl;
+  // Recompute just mass matrix on each step
+  Eigen::SparseMatrix<double> M;
+  igl::massmatrix(Vt_impLap, Ft, igl::MASSMATRIX_TYPE_BARYCENTRIC, M);
+  cout << "smoothing mass" << endl;
+  // Solve (M-delta*L) U = M*U
+  const auto& S = (M - step * L);
+  Eigen::SimplicialLLT<Eigen::SparseMatrix<double > > solver(S);
+  assert(solver.info() == Eigen::Success);
+  Vt_impLap = solver.solve(M * Vt_impLap).eval();
+  cout << "smoothing solve" << endl;
+  //cout << Vt_impLap << endl;
+  //Compute centroid and subtract (also important for numerics)
+  Eigen::VectorXd dblA;
+  igl::doublearea(Vt_impLap, Ft, dblA);
+  cout << "smoothing area" << endl;
+  double area = 0.5 * dblA.sum();
+  Eigen::MatrixXd BC;
+  igl::barycenter(Vt_impLap, Ft, BC);
+  cout << "smoothing BC" << endl;
+  Eigen::RowVector3d centroid(0, 0, 0);
+  for (int i = 0; i < BC.rows(); i++)
+  {
+      centroid += 0.5 * dblA(i) / area * BC.row(i);
+  }
+  cout << "reached centroid" << endl;
+  Vt_impLap.rowwise() -= centroid;
+  //// Normalize to unit surface area (important for numerics)
+  Vt_impLap.array() /= sqrt(area);
+  cout << "end of smooth()" << endl;
 }
 
 
@@ -389,7 +433,10 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
     }
     non_rigid_alignment(it);
     it++;
+    threshold += 0.3;
+    Vt_impLap = Vt;
   }
+
 
   // Display alignment result
   MatrixXd VVt(V.rows() + Vt.rows(), 3);
@@ -398,5 +445,15 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
   FFt << F, Ft + MatrixXi::Constant(Ft.rows(), 3, V.rows()); // Need to add #V to change vertex indices of template faces
   viewer.data().clear();
   viewer.data().set_mesh(Vt, Ft);
+
+
+
+  if (key == '3') {
+    smooth();
+    cout << "reached end of smoothing" << endl;
+    viewer.data().clear();
+    viewer.data().set_mesh(Vt_impLap, Ft);
+    //viewer.core.align_camera_center(V_impLap, F);
+  }
   return true;
 }
