@@ -47,17 +47,14 @@ void display_eigen_face(unsigned i);
 
 void display_eigen_face(unsigned i)
 {
-	Eigen::MatrixXd V_show1 = PCA_U.col(i);
-	//V_show1 += mean_face;
-	
+	V_show = PCA_U.col(i);
 	V_show.resize(v_rows, v_cols);
-	
-	for (unsigned row = 0; row < v_rows; ++row) {
-		for (unsigned col = 0; col < v_cols; ++col) {
-			V_show(row, col) = V_show1(col * v_rows + row);
-		}
-	}
-	
+
+    double scaling_factor = V_show.rowwise().norm().mean();
+    V_show /= scaling_factor;
+
+    V_show += mean_face;
+
 	viewer.data().clear();
 	viewer.data().set_mesh(V_show, F_show);
 	viewer.core.align_camera_center(V_show, F_show);

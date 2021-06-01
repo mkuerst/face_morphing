@@ -10,6 +10,10 @@ option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use ImGui"    ON)
 
 find_package(LIBIGL REQUIRED QUIET)
 
+set(CMAKE_CXX_STANDARD 17)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lstdc++fs -std=c++17")
+
+
 # Add your project files
 FILE(GLOB SRCFILES src/*.cpp)
 add_executable(${PROJECT_NAME} ${SRCFILES})
