@@ -47,9 +47,17 @@ void display_eigen_face(unsigned i);
 
 void display_eigen_face(unsigned i)
 {
-	V_show = PCA_U.col(i);
+	Eigen::MatrixXd V_show1 = PCA_U.col(i);
+	//V_show1 += mean_face;
+	
 	V_show.resize(v_rows, v_cols);
-	V_show += mean_face;
+	
+	for (unsigned row = 0; row < v_rows; ++row) {
+		for (unsigned col = 0; col < v_cols; ++col) {
+			V_show(row, col) = V_show1(col * v_rows + row);
+		}
+	}
+	
 	viewer.data().clear();
 	viewer.data().set_mesh(V_show, F_show);
 	viewer.core.align_camera_center(V_show, F_show);
@@ -58,17 +66,23 @@ void display_eigen_face(unsigned i)
 
 void change_eigen_value()
 {
-		
+
 	for (unsigned i = 0; i < n_eigenvalues; i++)
 	{
 		PCA_s(i, 0) = eigen_values_array[i];
 	}
+
+	Eigen::MatrixXd V_show1 = PCA_U * PCA_s;
+	//V_show1 += mean_face;
 	
-	
-	V_show = PCA_U * PCA_s;
 	V_show.resize(v_rows, v_cols);
-	V_show += mean_face;
-	std::cout <<  V_show.rows() << " " << V_show.cols() << std::endl;
+	for (unsigned row = 0; row < v_rows; ++row) {
+		for (unsigned col = 0; col < v_cols; ++col) {
+			V_show(row, col) = V_show1(col * v_rows + row);
+		}
+	}
+	
+	std::cout << V_show.rows() << " " << V_show.cols() << std::endl;
 	viewer.data().clear();
 	viewer.data().set_mesh(V_show, F_show);
 	viewer.core.align_camera_center(V_show, F_show);
@@ -83,11 +97,11 @@ void compute_pca()
 	// setup the system
 	for (unsigned i = 0; i < v_list.size(); i++)
 	{
-		Eigen::MatrixXd v_temp = v_list[i] - mean_face;
-		v_temp.resize(v_rows * v_cols, 1);
-		A.col(i) = v_temp;
+		//Eigen::MatrixXd v_temp = v_list[i] - mean_face;
+		Eigen::MatrixXd v_temp = v_list[i];
+		A.col(i) = v_temp.col(0);
 	}
-	
+
 	Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
 	PCA_s = svd.singularValues().head(n_eigenvalues); // this is a Vector
 	Eigen::MatrixXd U = svd.matrixU();
@@ -106,7 +120,7 @@ void compute_pca()
 		eigen_values_array[i] = PCA_s(i, 0);
 	}
 
-	std::cout << U.col(0) << std::endl;
+	//std::cout << U.col(0) << std::endl;
 	std::cout << "Mesh: " << v_rows << " " << v_cols << " " << n_meshes << std::endl;
 	std::cout << "U: " << PCA_U.rows() << " " << PCA_U.cols() << std::endl;
 	std::cout << "S: " << PCA_s.rows() << " " << PCA_s.cols() << std::endl;
@@ -118,7 +132,7 @@ void compute_pca()
 
 void compute_mean_face()
 {
-	mean_face.resize(v_rows, v_cols);
+	mean_face.resize(v_rows * v_cols, 1);
 	mean_face.setZero();
 
 	for (unsigned i = 0; i < n_meshes; i++)
@@ -148,11 +162,19 @@ void load_all_meshes()
 		Eigen::MatrixXd v_temp;
 
 		igl::read_triangle_mesh(entry.path().string(), v_temp, F_show);
-		
+
 		v_rows = v_temp.rows();
 		v_cols = v_temp.cols();
-		
-		v_list.push_back(v_temp);
+
+		Eigen::VectorXd v_temp2(v_rows * v_cols);
+
+		for (unsigned row = 0; row < v_rows; ++row) {
+			for (unsigned col = 0; col < v_cols; ++col) {
+				v_temp2(col * v_rows + row) = v_temp(row, col);
+			}
+		}
+
+		v_list.push_back(v_temp2);
 
 		n_meshes++;
 	}
