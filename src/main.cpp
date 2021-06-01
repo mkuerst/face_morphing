@@ -68,7 +68,6 @@ Eigen::MatrixXd Vt_impLap;
 bool prepared = false;
 bool init_knn = false;
 int it = 1;
-int cnt = 0;
 double threshold = 0.4;
 
 bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers);
@@ -101,11 +100,11 @@ double mean_dist(MatrixXd pos, RowVector3d center) {
 void rigid_alignment(string obj_file="", string lm_file="" )
 {
     //landmarks on scanned person
-    landmarks = get_landmarks("./data/person0__23landmarks");
+    landmarks = get_landmarks("../data/person0__23landmarks");
     igl::slice(V, landmarks, 1, landmarks_pos);
 
     //landmarks on template
-    landmarksT = get_landmarks("./data/headtemplate_23landmarks");
+    landmarksT = get_landmarks("../data/headtemplate_23landmarks");
     igl::slice(Vt, landmarksT, 1, landmarksT_pos);
 
     // center template to origin s.t. mean of its vertices is (0,0,0)
@@ -162,7 +161,6 @@ void ConvertConstraintsToMatrixForm(VectorXi indices, MatrixXd positions, Eigen:
 	std::vector<Eigen::Triplet<double> > tripletList;
 	C.resize(indices.rows()*3, Vt.rows()*3);
 	d.resize(3 * indices.size());
-  cout << "size of indices vector: " << indices.size() << endl;
 	for (int i = 0; i < indices.size(); i++) {
 		tripletList.push_back(Eigen::Triplet<double>(i, indices(i), lambda*1.));
 		tripletList.push_back(Eigen::Triplet<double>(indices.rows()+i, Vt.rows()+indices(i), lambda*1.));
@@ -187,7 +185,6 @@ void nra_prep() {
   for (int i=0; i<landmarks.rows(); i++) {
     added_constraints.insert(landmarks(i));
   }
-  cout << "reached scan boundary" << endl;
 
   igl::boundary_loop(Ft, boundaryT_ind);
   igl::slice(Vt, boundaryT_ind, 1, boundaryT_pos);
@@ -202,7 +199,7 @@ void nra_prep() {
     added_constraintsT.insert(boundaryT_ind(i));
   }
 
-  cout << "reached template boundary" << endl;
+  // results look worse with boundary constraints
   //add neighbors of boundary points
   // vector<vector<int>> Adj;
   // igl::adjacency_list(F, Adj);
@@ -216,39 +213,35 @@ void nra_prep() {
   //     }
   //     nb_neighbors--;
   // }   
-
   // igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
   // igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+
   inter_ind = landmarksT;
   inter_pos = landmarks_pos;
 
-  cout << "reached neighbors to boundary" << endl;
-
   // setup octree
   igl::octree(V, point_indices, CH, CN, W);
-
-  cout << "reached octree" << endl;
 }
 
 
 void non_rigid_alignment(int it=1) {
-  if (it == 10) {
-    // igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
-    // igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
-  }
+  // results look worse with boundary constraints
+  // if (it == 10) {
+  //   igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
+  //   igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+  // }
   
   VectorXi nearest_ind(Vt.rows());
   MatrixXd nearest_pos(Vt.rows(), 3);
   if (it > 1) {
     // calculate knn
-    int k = 20;
+    int k = 2;
     if (!init_knn) {
       igl::knn(Vt, V, k, point_indices, CH, CN, W, KNN);
-      cout << "reached knn" << endl;
       init_knn = true;
     }
     
-    // add nearest neighbors to constraints
+    // add closest point to constraints
     int cnt = 0;
     int ind;
     for (int i = 0; i < Vt.rows(); i++) {
@@ -266,7 +259,6 @@ void non_rigid_alignment(int it=1) {
 
     nearest_ind.conservativeResize(cnt);
     nearest_pos.conservativeResize(cnt, 3);
-    cout << "reached nearest pts" << endl;
   }
 
   //----------------------------------------------------------------
@@ -280,7 +272,6 @@ void non_rigid_alignment(int it=1) {
   igl::cotmatrix(Vt, Ft, L);
   b << L * Vt.col(0), L * Vt.col(1), L * Vt.col(2);
   igl::repdiag(L, 3, A);
-  cout << "reached your favorite laplacian" << endl;
 
   VectorXi constraints_ind;
   MatrixXd constraints_pos;
@@ -293,12 +284,10 @@ void non_rigid_alignment(int it=1) {
     constraints_ind = inter_ind;
     constraints_pos = inter_pos;
   }
-  cout << "reached constraint_pts" << endl;
   ConvertConstraintsToMatrixForm(constraints_ind, constraints_pos, C, d);
-  cout << "reached converted constraints to matrix" << endl;
 
   SparseMatrix<double> CT = C.transpose();
-  SparseMatrix<double> zeros(C.rows(), CT.cols()/*C.rows()*/);
+  SparseMatrix<double> zeros(C.rows(), C.rows());
   SparseMatrix<double> LHS, inter1, inter2;
   VectorXd RHS; 
 
@@ -311,58 +300,48 @@ void non_rigid_alignment(int it=1) {
   Eigen::SparseLU <Eigen::SparseMatrix<double>> solver;
   LHS.makeCompressed();
   solver.compute(LHS);
-  cout << "reached prefactor system" << endl;
   x_prime = solver.solve(RHS);
-  cout << "size 3*Vt.rows(): " << 3*Vt.rows() << endl;
-  cout << "size x_prime: " << x_prime.size() << endl; 
+ 
 
   Vt.col(0) = x_prime.segment(0, Vt.rows());
   Vt.col(1) = x_prime.segment(Vt.rows(), Vt.rows());
   Vt.col(2) = x_prime.segment(2*Vt.rows(), Vt.rows());
 
-  // update landmarkT positions and inter_pos
-  // VectorXi boundaryT_ind;
-  // MatrixXd boundaryT_pos;
-
-  // igl::boundary_loop(Ft, boundaryT_ind);
-  // igl::slice(Vt, boundaryT_ind, 1, boundaryT_pos);
-  // igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
   cout << "reached end of non-rigid-alignment" << endl;
-
 }
 
 void smooth() {
   double step = 0.000008;
   Eigen::SparseMatrix<double> L;
   igl::cotmatrix(Vt, Ft, L);
-  cout << "smoothing cot" << endl;
+
   // Recompute just mass matrix on each step
   Eigen::SparseMatrix<double> M;
   igl::massmatrix(Vt_impLap, Ft, igl::MASSMATRIX_TYPE_BARYCENTRIC, M);
-  cout << "smoothing mass" << endl;
+
   // Solve (M-delta*L) U = M*U
   const auto& S = (M - step * L);
   Eigen::SimplicialLLT<Eigen::SparseMatrix<double > > solver(S);
   assert(solver.info() == Eigen::Success);
   Vt_impLap = solver.solve(M * Vt_impLap).eval();
-  cout << "smoothing solve" << endl;
-  //cout << Vt_impLap << endl;
+
+
   //Compute centroid and subtract (also important for numerics)
   Eigen::VectorXd dblA;
   igl::doublearea(Vt_impLap, Ft, dblA);
-  cout << "smoothing area" << endl;
+
   double area = 0.5 * dblA.sum();
   Eigen::MatrixXd BC;
   igl::barycenter(Vt_impLap, Ft, BC);
-  cout << "smoothing BC" << endl;
+
   Eigen::RowVector3d centroid(0, 0, 0);
   for (int i = 0; i < BC.rows(); i++)
   {
       centroid += 0.5 * dblA(i) / area * BC.row(i);
   }
-  cout << "reached centroid" << endl;
+
   Vt_impLap.rowwise() -= centroid;
-  //// Normalize to unit surface area (important for numerics)
+  // Normalize to unit surface area (important for numerics)
   Vt_impLap.array() /= sqrt(area);
   cout << "end of smooth()" << endl;
 }
@@ -383,18 +362,9 @@ bool load_mesh(string filename)
 int main(int argc, char *argv[])
 {
   //load scanned person
-  load_mesh("./data/person0_.obj");
+  load_mesh("../data/person0_.obj");
   // load template
-  igl::read_triangle_mesh("./data/headtemplate.obj", Vt, Ft);
-
-  // For some reason I cannot dispaly the scan and template initially
-  // MatrixXd VVt(V.rows() + Vt.rows(), 3);
-  // MatrixXi FFt(F.rows() + Ft.rows(), 3);
-  // VVt << V, Vt;
-  // FFt << F, Ft + MatrixXi::Constant(Ft.rows(), 3, V.rows()); // Need to add #V to change vertex indices of template faces
-  // viewer.data().clear();
-  // viewer.data().set_mesh(VVt, FFt);
-  // viewer.core.align_camera_center(VVt);
+  igl::read_triangle_mesh("../data/headtemplate.obj", Vt, Ft);
 
   igl::opengl::glfw::imgui::ImGuiMenu menu;
   viewer.plugins.push_back(&menu);
@@ -450,7 +420,6 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
 
   if (key == '3') {
     smooth();
-    cout << "reached end of smoothing" << endl;
     viewer.data().clear();
     viewer.data().set_mesh(Vt_impLap, Ft);
     //viewer.core.align_camera_center(V_impLap, F);
