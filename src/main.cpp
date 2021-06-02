@@ -64,6 +64,9 @@ MatrixXd W;
 // Implicitly smoothed array, #Vx3
 Eigen::MatrixXd Vt_impLap;
 
+string file_name;
+string template_name;
+
 
 bool prepared = false;
 bool init_knn = false;
@@ -100,11 +103,13 @@ double mean_dist(MatrixXd pos, RowVector3d center) {
 void rigid_alignment(string obj_file="", string lm_file="" )
 {
     //landmarks on scanned person
-    landmarks = get_landmarks("../data/person0__23landmarks");
+    string landmarkfilepath = "../data/" + file_name + ".landmark";
+    landmarks = get_landmarks(landmarkfilepath.c_str());
     igl::slice(V, landmarks, 1, landmarks_pos);
 
     //landmarks on template
-    landmarksT = get_landmarks("../data/headtemplate_23landmarks");
+    string landmarktemplatepath = "../data/" + template_name + ".landmark";
+    landmarksT = get_landmarks(landmarktemplatepath.c_str());
     igl::slice(Vt, landmarksT, 1, landmarksT_pos);
 
     // center template to origin s.t. mean of its vertices is (0,0,0)
@@ -361,10 +366,20 @@ bool load_mesh(string filename)
 
 int main(int argc, char *argv[])
 {
+
+  if (argc != 2) {
+    file_name = "alain_normal";
+  }
+  else {
+    file_name = argv[1];
+  }
   //load scanned person
-  load_mesh("../data/person0_.obj");
+  string objfilepath = "../data/"+ file_name + ".obj";
+  load_mesh(objfilepath);
   // load template
-  igl::read_triangle_mesh("../data/headtemplate.obj", Vt, Ft);
+  template_name = "headtemplate_noneck";
+  string objtemplatepath = "../data/" + template_name + ".obj";
+  igl::read_triangle_mesh(objtemplatepath, Vt, Ft);
 
   igl::opengl::glfw::imgui::ImGuiMenu menu;
   viewer.plugins.push_back(&menu);
@@ -377,6 +392,49 @@ int main(int argc, char *argv[])
     // Add new group
     if (ImGui::CollapsingHeader("Deformation Controls", ImGuiTreeNodeFlags_DefaultOpen))
     {
+      if (ImGui::Button("Run on all meshes and save", ImVec2(-1, 0)))
+      {
+        // only works for the first mesh in the folder
+
+        unsigned n_meshes = 0;
+        std::string path = "../data/";
+        for (const auto& entry : std::__fs::filesystem::directory_iterator(path)) //this requires c++ 17 but the alternatives are ugly as hell :)
+        {
+          string currentpath = entry.path();
+          string extension = currentpath.substr(currentpath.find_last_of(".")+1);
+          if (extension != "obj")
+            continue;
+          file_name = currentpath.substr(8, currentpath.find_last_of(".")-8);
+
+          //load scanned person
+          string objfilepath = "../data/"+ file_name + ".obj";
+          igl::read_triangle_mesh(objfilepath, V, F);
+          // load template
+          template_name = "headtemplate_noneck";
+          string objtemplatepath = "../data/" + template_name + ".obj";
+          igl::read_triangle_mesh(objtemplatepath, Vt, Ft);
+
+
+          callback_key_down(viewer, '1', 0);
+          for (int i = 0; i < 25; ++i) {
+            callback_key_down(viewer, '2', 0);
+          }
+
+          string fileToSaveAligned = file_name + "-aligned.obj";
+          igl::writeOBJ("../data_aligned/" + fileToSaveAligned, Vt, Ft);
+
+          cout << "File succesfully saved to: " + fileToSaveAligned << endl;
+          n_meshes++;
+        }
+
+      }
+      if (ImGui::Button("Save aligned mesh", ImVec2(-1, 0)))
+      {
+        string fileToSaveAligned = file_name + "-aligned.obj";
+        igl::writeOBJ("../data_aligned/" + fileToSaveAligned, Vt, Ft);
+
+        cout << "File succesfully saved to: " + fileToSaveAligned << endl;
+      }
 
     }
   };
