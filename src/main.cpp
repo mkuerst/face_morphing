@@ -27,6 +27,7 @@ double eigen_values_array[n_eigenvalues];
 unsigned v_rows;
 unsigned v_cols;
 unsigned n_meshes;
+unsigned n_saved_meshes = 0;
 
 Eigen::MatrixXd mean_face;
 Eigen::MatrixXd A;
@@ -228,6 +229,16 @@ int main(int argc, char* argv[]) {
 				}
 			}
 		}
+		if (ImGui::CollapsingHeader("Saving", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+      if (ImGui::Button("Save current mesh", ImVec2(-1, 0)))
+      {
+        std::string savedFilename = "../morphed_mesh_" + std::to_string(n_saved_meshes) + ".obj";
+        igl::writeOBJ(savedFilename, V_show, F_show);
+        n_saved_meshes++;
+      }
+
+    }
 	};
 	load_all_meshes();
 	compute_pca();
