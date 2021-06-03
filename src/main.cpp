@@ -66,13 +66,13 @@ void display_eigen_face(unsigned i)
 void change_eigen_value()
 {
 
+    Eigen::MatrixXd PCA_s_temp = PCA_s;
 	for (unsigned i = 0; i < n_eigenvalues; i++)
 	{
-		PCA_s(i, 0) = eigen_values_array[i];
+		PCA_s_temp(i, 0) = eigen_values_array[i];
 	}
-
-	Eigen::MatrixXd V_show1 = PCA_U * PCA_s;
-	//V_show1 += mean_face;
+	Eigen::MatrixXd V_show1 = PCA_U * PCA_s_temp;
+//	V_show1 += mean_face;
 	
 	V_show.resize(v_rows, v_cols);
 	for (unsigned row = 0; row < v_rows; ++row) {
@@ -96,7 +96,7 @@ void compute_pca()
 	// setup the system
 	for (unsigned i = 0; i < v_list.size(); i++)
 	{
-		//Eigen::MatrixXd v_temp = v_list[i] - mean_face;
+//		Eigen::MatrixXd v_temp = v_list[i] - mean_face;
 		Eigen::MatrixXd v_temp = v_list[i];
 		A.col(i) = v_temp.col(0);
 	}
@@ -222,7 +222,9 @@ int main(int argc, char* argv[]) {
 			{
 				std::string i_str = "Eigenvalue " + std::to_string(i);
 				char const* i_chr = i_str.c_str();
-				if (ImGui::DragScalar(i_chr, ImGuiDataType_Double, &(eigen_values_array[i]), 0.1, 0, 0, "%.4f"))
+                double scaling_factor = PCA_s.col(0).mean() * 0.01;
+                if(scaling_factor < 0) { scaling_factor *= -1.0; }
+                if (ImGui::DragScalar(i_chr, ImGuiDataType_Double, &(eigen_values_array[i]), scaling_factor, 0, 0, "%.4f"))
 				{
 					std::cout << "Change Eigenvalue " << i << std::endl;
 					change_eigen_value();
