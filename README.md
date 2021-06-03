@@ -2,6 +2,10 @@
 
 ## Student data
 
+Name: Haraldur Orri Hauksson
+Legi-Nr: 20-942-892  
+Email: hhauksson@student.ethz.ch
+
 Name: Michael Kürsteiner  
 Legi-Nr: 16-708-414  
 Email: kumichae@student.ethz.ch
@@ -12,6 +16,8 @@ Email: popavel@student.ethz.ch
 
 ## Work division
 Landmark selection: Haraldur Orri Hauksson, Ana Zegarac
+
+Smoothing for mesh boundaries: Haraldur Orri Hauksson
 
 Rigid face alignment: Michael Kürsteiner
 
