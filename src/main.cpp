@@ -48,12 +48,13 @@ void display_eigen_face(unsigned i);
 void display_eigen_face(unsigned i)
 {
 	V_show = PCA_U.col(i);
-	V_show.resize(v_rows, v_cols);
 
     double scaling_factor = V_show.rowwise().norm().mean();
     V_show /= scaling_factor;
 
     V_show += mean_face;
+
+    V_show.resize(v_rows, v_cols);
 
 	viewer.data().clear();
 	viewer.data().set_mesh(V_show, F_show);
