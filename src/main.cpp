@@ -22,11 +22,13 @@
 #include <igl/slice_into.h>
 #include <igl/rotate_by_quat.h>
 
+
 #include "Lasso.h"
 #include "Colors.h"
 
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <string>
 
 #include <igl/cotmatrix.h>
@@ -57,7 +59,9 @@
 
 using namespace std;
 using namespace Eigen;
+namespace fs = std::filesystem;
 using Viewer = igl::opengl::glfw::Viewer;
+
 
 Viewer viewer;
 
@@ -175,7 +179,6 @@ std::vector<string> landmarklist;
 std::vector<string>::iterator current_mesh;
 bool first_init;
 std::string pathtomeshes = "../data/"; // eg. ../data/
-std::string meshlistpath = "../meshlist.txt";
 
 
 // updatemeshlist reads the file specified by meshlistpath and puts all the .obj files
@@ -184,28 +187,27 @@ void updatemeshlist () {
     meshlist.clear();
     landmarklist.clear();
 
-    std::ifstream myfile(meshlistpath);
+    for (const auto& entry : filesystem::directory_iterator(pathtomeshes)) //this requires c++ 17 but the alternatives are ugly as hell :)
+    {
+        std::string currentPath = entry.path().string();
+        std::string file = currentPath.substr(currentPath.find_last_of("/") + 1);
 
-    string line;
+        std::string extension = file.substr(file.find_last_of(".") + 1);
+        std::string fileName = file.substr(0, file.find_last_of("."));
 
-    if (myfile.is_open()) {
-        while ( getline (myfile,line) ) {
-            std::size_t found = line.find_last_of(".");
-            string filename = line.substr(0, found);
-            string extension = line.substr(found + 1);
-
-            if (extension == "obj") {
-                meshlist.push_back(filename);
-            }
-            else if (extension == "landmark") {
-                landmarklist.push_back(filename);
-            }
-            else cout << line << " has unknown extension." << std::endl;
-
+        if (extension == "obj") 
+        {
+            meshlist.push_back(fileName);
         }
-        myfile.close();
+        else if (extension == "landmark") 
+        {
+            landmarklist.push_back(fileName);
+        }
+        else 
+        {
+            cout << "File: " << currentPath << " not supported for landmarkins or smoothing." << endl;
+        }
     }
-    else cout << "Unable to open file";
 
     std::cout << "Total number of meshes: " << meshlist.size()
             << "\nNumber of landmark files: " << landmarklist.size()
