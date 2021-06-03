@@ -12,10 +12,15 @@ Email: popavel@student.ethz.ch
 
 ## Work division
 Landmark selection: Haraldur Orri Hauksson, Zegarac Ana
+
 Rigid face alignment: Michael Kürsteiner
+
 Non-rigid face alignment: Michael Kürsteiner, Haraldur Orri Hauksson, Pavel Pozdnyakov
+
 PCA, UI: Christopher Vogelsanger, Pavel Pozdnyakov, Zegarac Ana
+
 Report, Presentation slides: Zegarac Ana, Pavel Pozdnyakov
+
 Bonus 2 (Autoencoder): Christopher Vogelsanger
 
 
