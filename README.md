@@ -31,4 +31,17 @@ Bonus 2 (Autoencoder): Christopher Vogelsanger
 
 
 #### Presentation slides
-https://docs.google.com/presentation/d/1TO7acJaVpoU-tNrBaVQhV4lMdOnlyNggBV0Yxc8fQ5o/edit?usp=sharing
+https://docs.google.com/presentation/d/1TO7acJaVpoU-tNrBaVQhV4lMdOnlyNggBV0Yxc8fQ5o/edit?usp=sharing  
+
+
+
+Video for non-rigid alignment:  
+
+https://youtu.be/sTtTwpT7WTU  
+
+Screenshot non-rigidly aligned and smoothed example:  
+
+![Screenshot 2021-05-31 115452](https://user-images.githubusercontent.com/42907161/120681956-351d7f80-c49c-11eb-9e3b-b59c8184d5fc.png)  
+
+
+
