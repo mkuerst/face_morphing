@@ -156,6 +156,11 @@ void load_all_meshes()
 	std::string path = "../data/";
 	for (const auto& entry : filesystem::directory_iterator(path)) //this requires c++ 17 but the alternatives are ugly as hell :)
 	{
+    string currentpath = entry.path().string();
+    string extension = currentpath.substr(currentpath.find_last_of(".")+1);
+    if (extension != "obj")
+      continue;
+
 		std::cout << entry.path() << std::endl;
 		Eigen::MatrixXd v_temp;
 
