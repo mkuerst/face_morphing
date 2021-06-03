@@ -18,6 +18,10 @@ Name: Ana Zegarac
 Legi-Nr: 18-941-591  
 Email: ana.zegarac@math.ethz.ch
 
+Name: Christopher Vogelsanger
+Legi-Nr: 16-933-863
+Email: cvogelsa@student.ethz.ch
+
 ## Work division
 - **Landmark selection**: Haraldur Orri Hauksson, Ana Zegarac
 - **Smoothing for mesh boundaries**: Haraldur Orri Hauksson
