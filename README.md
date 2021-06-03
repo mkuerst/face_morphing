@@ -2,7 +2,7 @@
 
 ## Student data
 
-Name: Haraldur Orri Hauksson
+Name: Haraldur Orri Hauksson  
 Legi-Nr: 20-942-892  
 Email: hhauksson@student.ethz.ch
 
