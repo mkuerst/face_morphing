@@ -12,6 +12,7 @@
 #include <igl/knn.h>
 #include <igl/cat.h>
 #include <unordered_set>
+#include<filesystem>
 
 
 using namespace std;
@@ -170,8 +171,8 @@ void ConvertConstraintsToMatrixForm(VectorXi indices, MatrixXd positions, Eigen:
 		tripletList.push_back(Eigen::Triplet<double>(i, indices(i), lambda*1.));
 		tripletList.push_back(Eigen::Triplet<double>(indices.rows()+i, Vt.rows()+indices(i), lambda*1.));
     tripletList.push_back(Eigen::Triplet<double>(2 * indices.rows()+i, 2 * Vt.rows()+indices(i), lambda*1.));
-		d(i) = lambda*positions(i, 0);
-		d(i + indices.rows()) = lambda*positions(i, 1);
+	d(i) = lambda*positions(i, 0);
+	d(i + indices.rows()) = lambda*positions(i, 1);
     d(i + 2 * indices.rows()) = lambda*positions(i, 2);
 	}
 	C.setFromTriplets(tripletList.begin(), tripletList.end());
@@ -182,28 +183,29 @@ void nra_prep() {
   igl::boundary_loop(F, boundary_ind);
   igl::slice(V, boundary_ind, 1, boundary_pos);
 
+  
   // add scan landmarks and boundary as constraints
   for (int i=0; i<boundary_ind.rows(); i++) {
       added_constraints.insert(boundary_ind(i));
   }
-
+  
   for (int i=0; i<landmarks.rows(); i++) {
     added_constraints.insert(landmarks(i));
   }
-
+  
   igl::boundary_loop(Ft, boundaryT_ind);
   igl::slice(Vt, boundaryT_ind, 1, boundaryT_pos);
 
-
+  
   // add template landmarks and boundary as constraint
   for (int i=0; i<landmarksT.rows(); i++) {
     added_constraintsT.insert(landmarksT(i));
   }
-
-  for (int i=0; i<boundary_ind.rows(); i++) {
+  
+  for (int i=0; i<boundaryT_ind.rows(); i++) {
     added_constraintsT.insert(boundaryT_ind(i));
   }
-
+  
   // results look worse with boundary constraints
   //add neighbors of boundary points
   // vector<vector<int>> Adj;
@@ -218,14 +220,15 @@ void nra_prep() {
   //     }
   //     nb_neighbors--;
   // }   
-  // igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
-  // igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos);
+  //igl::cat(1, landmarksT, boundaryT_ind, inter_ind);
+  //igl::cat(1, landmarks_pos, boundaryT_pos, inter_pos); //boundaryT_pos
 
   inter_ind = landmarksT;
   inter_pos = landmarks_pos;
 
   // setup octree
   igl::octree(V, point_indices, CH, CN, W);
+  
 }
 
 
@@ -253,7 +256,10 @@ void non_rigid_alignment(int it=1) {
         ind = KNN(i, 1);
         double dist = (Vt.row(i) - V.row(ind)).norm();
         // check if point already in added_constraints
-        if (added_constraintsT.find(i) == added_constraintsT.end() && added_constraints.find(ind) == added_constraints.end() && dist < threshold) {
+        if (added_constraintsT.find(i) == added_constraintsT.end()
+            && added_constraints.find(ind) == added_constraints.end() 
+            && dist < threshold) 
+        {
           //cout << "added vertex: " << ind << endl;
           nearest_ind(cnt) = i;
           nearest_pos.row(cnt) = V.row(ind);
@@ -398,13 +404,17 @@ int main(int argc, char *argv[])
 
         unsigned n_meshes = 0;
         std::string path = "../data/";
-        for (const auto& entry : std::__fs::filesystem::directory_iterator(path)) //this requires c++ 17 but the alternatives are ugly as hell :)
+        //this requires c++ 17 but the alternatives are ugly as hell :)
+        //for (const auto& entry : std::__fs::filesystem::directory_iterator(path)) //MAC-OS
+        int counter = 0;
+        for (const auto& entry : filesystem::directory_iterator(path)) // WINDOWS
         {
-          string currentpath = entry.path();
+          //auto currentpath = entry.path(); //MAC-OS
+          auto currentpath = entry.path().string(); //WINDOWS
           string extension = currentpath.substr(currentpath.find_last_of(".")+1);
-          if (extension != "obj")
-            continue;
           file_name = currentpath.substr(8, currentpath.find_last_of(".")-8);
+          if (extension != "obj" || file_name == "headtemplate" || file_name == "headtemplate_noneck")
+            continue;
 
           //load scanned person
           string objfilepath = "../data/"+ file_name + ".obj";
@@ -414,9 +424,9 @@ int main(int argc, char *argv[])
           string objtemplatepath = "../data/" + template_name + ".obj";
           igl::read_triangle_mesh(objtemplatepath, Vt, Ft);
 
-
+          cout << "About to run alignment on " << file_name << endl;
           callback_key_down(viewer, '1', 0);
-          for (int i = 0; i < 25; ++i) {
+          for (int i = 0; i < 20; ++i) {
             callback_key_down(viewer, '2', 0);
           }
 
@@ -425,6 +435,17 @@ int main(int argc, char *argv[])
 
           cout << "File succesfully saved to: " + fileToSaveAligned << endl;
           n_meshes++;
+
+          prepared = false;
+          init_knn = false;
+          it = 1;
+          threshold = 0.4;
+
+          added_constraintsT.clear();
+          added_constraints.clear();
+          point_indices.clear();
+
+          counter++;
         }
 
       }
@@ -451,6 +472,14 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
 
   if (key == '1') {
     rigid_alignment();
+    // Display rigid alignment result
+    MatrixXd VVt(V.rows() + Vt.rows(), 3);
+    MatrixXi FFt(F.rows() + Ft.rows(), 3);
+    VVt << V, Vt;
+    FFt << F, Ft + MatrixXi::Constant(Ft.rows(), 3, V.rows()); // Need to add #V to change vertex indices of template faces
+    viewer.data().clear();
+    viewer.data().set_mesh(VVt, FFt);
+    cout << "reached end of rigid alignment" << endl;
   }
 
   if (key == '2') {
@@ -463,17 +492,11 @@ bool callback_key_down(Viewer& viewer, unsigned char key, int modifiers)
     it++;
     threshold += 0.3;
     Vt_impLap = Vt;
+
+    // Display next iteration of non-rigid alignment
+    viewer.data().clear();
+    viewer.data().set_mesh(Vt, Ft);
   }
-
-
-  // Display alignment result
-  MatrixXd VVt(V.rows() + Vt.rows(), 3);
-  MatrixXi FFt(F.rows() + Ft.rows(), 3);
-  VVt << V, Vt;
-  FFt << F, Ft + MatrixXi::Constant(Ft.rows(), 3, V.rows()); // Need to add #V to change vertex indices of template faces
-  viewer.data().clear();
-  viewer.data().set_mesh(Vt, Ft);
-
 
 
   if (key == '3') {
