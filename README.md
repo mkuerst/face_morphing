@@ -11,15 +11,15 @@ Legi-Nr: 11-557-048
 Email: popavel@student.ethz.ch
 
 ## Work division
-Landmark selection: Haraldur Orri Hauksson, Zegarac Ana
+Landmark selection: Haraldur Orri Hauksson, Ana Zegarac
 
 Rigid face alignment: Michael Kürsteiner
 
 Non-rigid face alignment: Michael Kürsteiner, Haraldur Orri Hauksson, Pavel Pozdnyakov
 
-PCA, UI: Christopher Vogelsanger, Pavel Pozdnyakov, Zegarac Ana
+PCA, UI: Christopher Vogelsanger, Pavel Pozdnyakov, Ana Zegarac
 
-Report, Presentation slides: Zegarac Ana, Pavel Pozdnyakov
+Report, Presentation slides: Ana Zegarac, Pavel Pozdnyakov
 
 Bonus 2 (Autoencoder): Christopher Vogelsanger
 
