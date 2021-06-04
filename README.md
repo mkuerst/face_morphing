@@ -139,4 +139,7 @@ Below are the meshes with the isolated components loaded in MeshLab:
 <img width="589" alt="Screenshot 2021-06-03 at 20 07 21" src="https://user-images.githubusercontent.com/42907161/120756648-ce39ae00-c50f-11eb-90b5-45018a8b0119.png">  
 <img width="534" alt="Screenshot 2021-06-03 at 20 07 43" src="https://user-images.githubusercontent.com/42907161/120756658-d1cd3500-c50f-11eb-844e-ff2c89c114a2.png">  
 
+Download Link to the scanned faces without these isolated components and the non-rigidly aligned alex wacky mesh:  
+https://polybox.ethz.ch/index.php/s/cjRhESLI9sI38pl  
+
 
