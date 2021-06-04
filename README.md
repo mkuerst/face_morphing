@@ -145,7 +145,7 @@ Below are the meshes with the isolated components loaded in MeshLab:
 
 ### Autoencoder
 
-The autoencoder code runs a simple fully connected autoencoder on all meshes in the folder `data`. A seperate viewer allows the user to look at reconstructions and change the latent space.
+The autoencoder code runs a simple fully connected autoencoder on all meshes in the folder `data`. A seperate viewer allows the user to look at reconstructions and change the latent space. (Download link for trained networks, https://polybox.ethz.ch/index.php/s/8DPcxE043TmiCjq)
 
 Reconstruction of a high resulution mesh:
 
@@ -177,3 +177,5 @@ Latent space impact:
 Latent space impact:
 
 ![](results/ae-7.PNG)
+
+
