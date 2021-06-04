@@ -154,8 +154,33 @@ To perform morphing from e.g. a face with a neutral facial expression to a face 
 ![](results/pca-smile1.png)
 ![](results/pca-smile2.png)
 
-Otherwise, by running the code on all available meshes, the user can analyse the most prominent features in the given set of meshes and create new meshes. The UI also allows the user to save the newly created meshes.  
+In the example below we perfomed PCA on on all faces with smile and neutral facial expression. 
+One of the possible transfomations is illustrated by the two images below.
+![](results/pca_morphing_non-smile.png)
+![](results/pca_morphing_smile.png)
 
+The next two images illustrate the possibility to morph one face into another.
+![](results/pca_morphing_face_a.png) 
+![](results/pca_morphing_face_b.png)
+
+To be able to do that we performed the PCA on 6 different meshes, 3 for each face ("selina" and "jan").
+The morphing occurs by increasing or decreasing the eigenvalues corresponding to the eigenfaces 
+responsible for the representation of a particular face.
+
+Below are the six eigenfaces. 
+One can see that the first one represents the features of both of the faces.
+![](results/pca_morphing_eigenface_0.png)
+
+The second and third eigenfaces correspond more to the features of the first face.
+![](results/pca_morphing_eigenface_1.png)
+![](results/pca_morphing_eigenface_2.png)
+
+The next three eigenfaces correspond more to the features of the second face.
+![](results/pca_morphing_eigenface_3.png)
+![](results/pca_morphing_eigenface_4.png)
+![](results/pca_morphing_eigenface_5.png)
+
+Otherwise, by running the code on all available meshes, the user can analyse the most prominent features in the given set of meshes and create new meshes. The UI also allows the user to save the newly created meshes.  
 
 ### Autoencoder
 
