@@ -150,5 +150,8 @@ The autoencoder code runs a simple fully connected autoencoder on all meshes in 
 ![](results/ae-2.png)
 ![](results/ae-3.png)
 
+
 The high number of verticies makes the compression rather steep and thus the reconstructed faces look all very similar. On the lower resolution data from the past years the approach works definitively better.
 ![](results/ae-4.png)
+![](results/ae-5.png)
+![](results/ae-6.png)
