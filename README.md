@@ -133,7 +133,7 @@ Otherwise, by running the code on all available meshes, the user can analyse the
 
 ### Small Isolated Components  
 
-Two of the provided scanned and cleaned faces (alex wacky & nick smile) had a very small isolated component on top that would make the system we build for the non-rigid alignment unsolvable and the program would crash. Hence, we removed those isolated components in MeshLab and then ran the non-rigid alignment on the new meshes. The alex wacky mesh can now be non-rigidly aligned. However, the nick smile mesh crashes during the building process of its octree in the igl::octree call because of a stack overflow. Unfortunately, we ran out of time and were not abled to find the cause of the problem.  
+Two of the provided scanned and cleaned faces (alex wacky & nick smile) had a very small isolated component on top that would make the system we build for the non-rigid alignment unsolvable and the program would crash. Hence, we removed those isolated components in MeshLab and then ran the non-rigid alignment on the new meshes. The alex wacky mesh can now be non-rigidly aligned. However, the nick smile mesh crashes during the building process of its octree in the igl::octree call because of a stack overflow. Unfortunately, we ran out of time and were not able to find the cause of the problem.  
 Below are the meshes with the isolated components loaded in MeshLab:  
 
 <img width="589" alt="Screenshot 2021-06-03 at 20 07 21" src="https://user-images.githubusercontent.com/42907161/120756648-ce39ae00-c50f-11eb-90b5-45018a8b0119.png">  
