@@ -146,12 +146,13 @@ Below are the meshes with the isolated components loaded in MeshLab:
 ### Autoencoder
 
 The autoencoder code runs a simple fully connected autoencoder on all meshes in the folder `data`. A seperate viewer allows the user to look at reconstructions and change the latent space.
-![](results/ae-1.png)
-![](results/ae-2.png)
-![](results/ae-3.png)
+![](results/ae-1.PNG)
+![](results/ae-2.PNG)
+![](results/ae-3.PNG)
 
 
 The high number of verticies makes the compression rather steep and thus the reconstructed faces look all very similar. On the lower resolution data from the past years the approach works definitively better.
-![](results/ae-4.png)
-![](results/ae-5.png)
-![](results/ae-6.png)
+![](results/ae-4.PNG)
+![](results/ae-5.PNG)
+![](results/ae-6.PNG)
+![](results/ae-7.PNG)
