@@ -34,6 +34,7 @@ Email: cvogelsa@student.ethz.ch
 
 
 ## Presentation slides
+Can be found in the `results` folder or on the following link:
 https://docs.google.com/presentation/d/1TO7acJaVpoU-tNrBaVQhV4lMdOnlyNggBV0Yxc8fQ5o/edit?usp=sharing  
 
 ## Report
