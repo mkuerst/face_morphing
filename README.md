@@ -1,4 +1,4 @@
-# Shape Modeling and Geometry Processing - Assignment 6 Group Project
+# Shape Modeling and Geometry Processing - Assignment 6 Group Project - Group 6
 
 ## Student data
 
