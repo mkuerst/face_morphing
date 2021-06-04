@@ -45,6 +45,23 @@ Since the project has three distinct parts, we organised the codebase in three b
 
 We describe our approach to each of these three parts below and link the outputs.
 
+### OS compatibility warning
+
+Most parts of the project rely on the filesystem library to load the meshes iteratively. This library requires C++17. Moreover, while 
+```
+for (const auto& entry : filesystem::directory_iterator(pathtomeshes))
+{
+  ...
+}
+```
+works on Windows, on macOS this line has to be changed to 
+```
+for (const auto& entry : std::__fs::filesystem::directory_iterator(pathtomeshes))
+{
+  ...
+}
+```
+
 ### Landmarks
 
 The UI for creating landmarks looks as follows.
