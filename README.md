@@ -143,6 +143,10 @@ Otherwise, by running the code on all available meshes, the user can analyse the
 
 The autoencoder code runs a simple fully connected autoencoder on all meshes in the folder `data`. A seperate viewer allows the user to look at reconstructions and change the latent space. (Download link for trained networks, https://polybox.ethz.ch/index.php/s/8DPcxE043TmiCjq)
 
+![](results/ae-0.PNG)
+
+We tested around with different networks (Convolutional, VAEs) and multiple preprocessing steps (subtracting the mean, scaling the vertex positions down to 1.0, -1.0) but in the end a simple fully connected network gave the best results for the small set of last years data provided (see 2 sections down). For the higher resolution meshes of this year the network learns more of a mean mesh.
+
 Reconstruction of a high resulution mesh:
 
 ![](results/ae-1.PNG)
